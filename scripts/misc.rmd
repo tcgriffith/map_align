@@ -1,0 +1,69 @@
+---
+title: "Untitled"
+author: "TC"
+date: "9/24/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## R Markdown
+
+plot map
+
+```{r eval=FALSE}
+a <- readLines(con="../2pd0_A.pdb.map")
+
+a.cln <- grep("^CON",a, value = TRUE)
+
+# a.cln
+
+a.df <- data.table::fread(paste(a.cln,collapse = "\n"))
+  
+```
+
+
+```{r}
+
+read_contactmap <- function(filepath) {
+  a <- readLines(con = filepath)
+  a.cln <- grep("^CON", a, value = TRUE)
+  a.df <- data.table::fread(paste(a.cln, collapse = "\n"))
+  return(a.df)
+}
+```
+
+
+
+```{r}
+
+a.df <- read_contactmap("../2pd0_A.pdb.map")
+
+gg <- ggplot(a.df) +
+  geom_tile(aes(x=V2,y=V3,fill=V4))
+
+gg
+```
+
+
+```{r}
+xrange <- ggplot_build(gg)$layout$panel_scales_x[[1]]$range$range
+yrange <- ggplot_build(gg)$layout$panel_scales_y[[1]]$range$range
+```
+
+
+
+```{r}
+
+a.df <- read_contactmap("../3u97_A.gremlin.map")
+
+gg2 <- ggplot(a.df) +
+  geom_tile(aes(x=V2,y=V3,fill=V4)) + xlim(xrange)+ylim(yrange)
+
+gg2
+```
+
+
