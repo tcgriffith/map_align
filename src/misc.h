@@ -16,7 +16,7 @@ namespace misc{
 
     inline std::string basename(const std::string& str_path);
 
-    std::string trim(const std::string& str)
+    inline std::string trim(const std::string& str)
     {
         size_t first = str.find_first_not_of(' ');
         if (std::string::npos == first)
@@ -26,6 +26,8 @@ namespace misc{
         size_t last = str.find_last_not_of(' ');
         return str.substr(first, (last - first + 1));
     }
+
+
 }
 
 

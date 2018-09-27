@@ -19,6 +19,19 @@ double atom::distance(atom &other){
     return dist;
 }
 
+double atom::distance2(atom &other){
+    double dist2=0.0;
+    double *x1 = this->get_x();
+    double *x2 = other.get_x();
+
+    dist2= (pow((x1[0]-x2[0]),2)+
+               pow((x1[1]-x2[1]),2)+
+               pow((x1[2]-x2[2]),2)
+               );
+
+    return dist2;
+}
+
 double atom::get_cos_angle_p(atom &other){
     double anglep=-999;
 
@@ -195,6 +208,11 @@ bool residue::is_rna_pair(residue & other_res){
 
     if (!this->rna_check_hhatoms() || !other_res.rna_check_hhatoms()) return false;
 
+    atom * c4a = this->get_atom("C4'");
+    atom * c4b = other_res.get_atom("C4'");
+
+    if (c4a->distance2(*c4b)> 500) return false;
+
     bool is_pair=false;
 
     std::vector<atom *> res_a_hhatm = this->rna_get_hhatoms();
@@ -255,109 +273,6 @@ std::string chain::get_seq(){
 }
 
 
-// deprecated, use structure::rna_init_pairs()
-// bool chain::rna_init_pairs(){
-
-//     for (auto & res_i : this->residues){
-//         for (auto & res_j : this->residues){
-//             if (res_i.get_resid() < res_j.get_resid()){
-//                 if (res_i.is_rna_pair(res_j)){
-//                     // cout <<res_i.get_resid() << "_" <<res_j.get_resid() <<" "<<res_i.get_resname() << "_" <<res_j.get_resname() <<endl;
-//                     this->pairs.push_back(pair<residue *, residue *>(&res_i,&res_j));
-//                     res_i.set_has_pair(true);
-//                     res_i.set_ss("(");
-
-//                     res_j.set_has_pair(true);
-
-//                     res_j.set_ss(")");
-//                 }
-//             }
-
-//         }
-//     }
-
-//     this->pair_inited = true;
-//     return 0;
-// }
-
-// std::string chain::get_pairseq(){
-//     string tmpseq="";
-
-//     for (auto & a_res : this->residues){
-//         if(a_res.has_pair()){
-//             tmpseq+="1";
-//         }
-//         else{
-//             tmpseq+="0";
-//         }
-
-//     }
-//     return tmpseq;
-// }
-
-// std::string chain::get_ss_seq(){
-//     string tmpseq="";
-
-//     for (auto & a_res : this->residues){
-//         tmpseq+= a_res.get_ss();
-//     }
-
-//     return tmpseq;
-
-// }
-
-// deprecated;
-// bool chain::rna_init_polar(){
-//     for (int i=0; i < this->residues.size(); i++){
-
-
-//         residue * a_res = &this->residues.at(i);
-//         residue * next_res;
-// // residues should pass atoms check
-//         if (!a_res->rna_check_atoms()) continue;
-
-//         if (i + 1 < residues.size()) next_res = &this->residues.at(i+1);
-//         else next_res =nullptr;
-
-
-//         for (auto & a_atom : a_res->atoms){
-//             string atype = a_atom.get_type();
-//             if (rna_atom_neighbors.find(atype) != rna_atom_neighbors.end()) {
-//                 a_atom.set_polar(true);
-
-//                 Xvec r_ref;
-
-//                 Xvec a_atom_vec = Xvec(a_atom.get_x());
-
-//                 for (auto & nb_atom_name : rna_atom_neighbors.at(atype)){
-
-//                     atom * nb_atom;
-//                     if (nb_atom_name == "P_n"){
-//                         if (next_res != nullptr && next_res->check_atoms()){
-//                             nb_atom = next_res->get_atom("P");
-//                         }
-//                     }
-//                     else {
-//                         nb_atom = a_res->get_atom(nb_atom_name);
-//                     }
-
-//                     if (nb_atom == nullptr){
-//                         cout << i << " error" << nb_atom_name << " " << a_res->get_resid() << endl;
-//                     }
-
-//                     Xvec nb_atom_vec = Xvec(nb_atom->get_x());
-//                     r_ref = r_ref + a_atom_vec - nb_atom_vec;
-//                 }
-
-//                 a_atom.set_pvec(r_ref);
-//             }
-//         }
-//     }
-
-//     this->polar_inited = true;
-//     return 0;
-// }
-
 
 
 // ###########################################
@@ -403,16 +318,16 @@ bool structure::readpdb(std::string pdbname){
         if(line.substr(0,4) != "ATOM") continue;
 
         rn = line.substr(17,3);
-        misc::trim(rn);
+        rn = misc::trim(rn);
         rn = pdb_utils::format_rna(rn);
         an = line.substr(13,3);
         an = pdb_utils::format_rna(an);
 
         alt = line.substr(16,1);
-        misc::trim(an);
+        an = misc::trim(an);
         cid=line[21];
-        rid = line.substr(23,4);
-        misc::trim(rid);
+        rid = line.substr(22,5);
+        rid = misc::trim(rid);
 
         if (alt != " "){
             if (lastalt == "RAGNAROK!") lastalt = alt;
@@ -503,14 +418,9 @@ bool structure::rna_init_pairs(){
                     }
 
                     if (ares.is_rna_pair(bres)){
-                        // cout <<ares.get_resid() << "_" <<bres.get_resid() <<" "<<ares.get_resname() << "_" <<bres.get_resname() <<endl;
+
                         this->pairs.push_back(pair<residue *, residue *>(&ares,&bres));
-                        ares.set_paired(true);
-                        ares.pair_v.push_back(&bres);
-                        // ares.set_ss("(");
-                        bres.set_paired(true);
-                        bres.pair_v.push_back(&ares);
-                        // bres.set_ss(")");
+
                     }
 
                 }
@@ -576,4 +486,23 @@ bool structure::rna_init_polar(){
     }
     this->_polar_inited = true;
     return 0;
+}
+
+std::string structure::get_mapstr(){
+
+    std::string outstr = "";
+    char tmp[2000];
+
+    sprintf(tmp,"LEN %d\n", this->get_nres());
+
+    outstr += tmp;
+
+
+    for (auto & apair: this->pairs){
+        sprintf(tmp,"CON\t%s\t%s\t1\n",apair.first->get_resid().c_str(), apair.second->get_resid().c_str());
+
+        outstr += tmp;
+    }
+
+    return outstr;
 }

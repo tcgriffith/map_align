@@ -1,5 +1,7 @@
 // no boost this time
 // class: atom, residue, chain, structure
+#ifndef _PDB
+#define _PDB
 #include <string>
 #include <sstream>
 #include <vector>
@@ -42,6 +44,7 @@ public:
     std::string get_type(){return atomtype;};
     int get_id(){return atomid;}
     double distance(atom &other);
+    double distance2(atom &other);
     static double torsion(atom &aa, atom &ab, atom &ac, atom &ad);
 
 
@@ -107,15 +110,27 @@ public:
 
     bool addatom(atom &a_atom){atoms.push_back(a_atom); return 0;};
     bool addatom_tomap(atom *a_atom, string atomname){atoms_map.insert({atomname,a_atom}); return 0;};
-    atom * get_atom(string an){if (atoms_map.find(an) !=atoms_map.end()) return atoms_map.at(an); else return NULL;};
+    atom * get_atom(string an){
+        if (atoms_map.find(an) !=atoms_map.end()) return atoms_map.at(an);
+        else {
+            cerr << "atom not found: " << an << endl;
+            return NULL;
+        }
+
+    };
     int atom_num(){return atoms.size();}
 
 
 
     // RNA specific
+    bool _paired = false;
+    // move to
+    // void set_paired(bool paired){_paired = paired;};
+
     bool is_rna_pair(residue &);
     bool rna_check_atoms();
     bool rna_check_hhatoms();
+
     std::vector<atom *> rna_get_hhatoms();
     Xvec rna_get_planevec();
 
@@ -176,8 +191,11 @@ public:
 
     bool rna_init_polar();
     bool rna_init_pairs();
+    std::vector<std::pair<residue *, residue *>> pairs;
+
+    std::string get_mapstr();
 
 };
 
 
-
+#endif
