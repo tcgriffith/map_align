@@ -1,5 +1,6 @@
 // no boost this time
 // class: atom, residue, chain, structure
+// framework for residues
 #ifndef _PDB
 #define _PDB
 #include <string>

@@ -14,16 +14,6 @@ library(tidyverse)
 
 plot map
 
-```{r eval=FALSE}
-a <- readLines(con="../test/2pd0_A.pdb.map")
-
-a.cln <- grep("^CON",a, value = TRUE)
-
-# a.cln
-
-a.df <- data.table::fread(paste(a.cln,collapse = "\n"))
-
-```
 
 
 ```{r}
@@ -40,7 +30,7 @@ read_contactmap <- function(filepath) {
 
 ```{r}
 
-a.df <- read_contactmap("../test/2pd0_A.pdb.map")
+a.df <- read_contactmap("../test/1mfj_A_xp.map")
 
 gg <- ggplot(a.df) +
   geom_tile(aes(x=V2,y=V3,fill=V4))
@@ -50,20 +40,31 @@ gg
 
 
 ```{r}
-xrange <- ggplot_build(gg)$layout$panel_scales_x[[1]]$range$range
-yrange <- ggplot_build(gg)$layout$panel_scales_y[[1]]$range$range
-```
 
+a.df <- read_contactmap("../test/1mfk_A_xp.map")
+
+gg <- ggplot(a.df) +
+  geom_tile(aes(x=V2,y=V3,fill=V4))
+
+gg
+```
 
 
 ```{r}
 
-a.df <- read_contactmap("../test/3u97_A.gremlin.map")
+a.df <- read_contactmap("/home/tc/GIT/map_align/spalign_data/RMalign/datasets/scor/pdb_chain_map/1k01_A.pdb.map")
 
-gg2 <- ggplot(a.df) +
-  geom_tile(aes(x=V2,y=V3,fill=V4)) + xlim(xrange)+ylim(yrange)
+gg <- ggplot(a.df) +
+  geom_tile(aes(x=V2,y=V3,fill=V4))
 
-gg2
+gg
 ```
 
+```{r}
+tmp <- data.table::fread("/home/tc/GIT/map_align/spalign_data/RMalign/datasets/scor/pairstat")
+
+tmp <- tmp[-419]
+
+summary(tmp)
+```
 

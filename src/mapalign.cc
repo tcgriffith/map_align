@@ -275,6 +275,11 @@ vec_int load_data (string file, int sep_cutoff, mtx_double &mtx, vec_int &vec_di
         is >> label;
         if(label == "LEN" or label == "SIZE"){
             int size; is >> size;
+            // exit if too long
+            if (size > 500){
+                cerr << file << " too long" << endl;
+                exit(1);
+            }
 
 			if(range.size() > 0){range.resize(size,0);} // if range previously defined fill rest with "0"
 			else{range.resize(size,1);} // else set all to "1"
@@ -294,6 +299,7 @@ vec_int load_data (string file, int sep_cutoff, mtx_double &mtx, vec_int &vec_di
             ss.resize(m,'X');
         }
         else if(label == "CON"){
+            // 0 based
             int i, j; is >> i >> j;
 			if(range[i] == 1 and range[j] == 1){
 				double sco;

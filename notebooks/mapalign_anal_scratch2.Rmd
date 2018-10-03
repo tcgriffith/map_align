@@ -1,0 +1,59 @@
+---
+title: "Untitled"
+author: "TC"
+date: "10/2/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## non-local pairs
+
+```{r}
+source("../scripts/mapaln_funs.R")
+```
+
+
+```{r}
+
+
+myfiles <- list.files("~/GIT/map_align/spalign_data/RMalign/datasets/scor/pdb_chain_map",full.names = TRUE)
+
+mymaps <-lapply(myfiles,read_contactmap)
+```
+
+```{r}
+library(dplyr)
+
+get_nonlocal <- function(df){
+  df.non <- df %>%
+    filter(abs(V2-V3) >= 3)
+  
+  return(df.non)
+}
+
+mymaps.non <- lapply(mymaps,get_nonlocal)
+```
+
+
+```{r}
+
+library(ggplot2)
+mydf <- data.frame(pdb_chain = stringr::str_sub(basename(myfiles),1,6),
+                   len.all = sapply(mymaps,nrow),
+           nconn = sapply(mymaps.non,nrow))
+
+ggplot(mydf,aes(x=len.all,y=len.non)) +geom_point()+
+  scale_x_log10()+scale_y_log10()+
+  geom_abline()
+
+
+ncon.cln <- mydf %>% select(1,3)
+
+save(ncon.cln,file = "../spalign_data/tmpdata/ncon.cln.rda")
+
+
+```
+

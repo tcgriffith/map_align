@@ -1,0 +1,84 @@
+---
+title: "Untitled"
+author: "TC"
+date: "10/2/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+```{r}
+source("../scripts/mapaln_funs.R")
+source("~/GIT/spalign/SPalignNS/scripts/misc_funs.R")
+```
+
+
+## normalize test
+
+```{r}
+load("../spalign_data/tmpdata/mapaln.rmsp.rda")
+```
+
+```{r}
+mapaln.rmsp2 <-
+  mapaln.rmsp %>%
+  mutate(nconbylen1 =nconn1/len1,
+         nconbylen2 = nconn2/len2) %>%
+  select(starts_with("pdb_chain"),V3,V4,V5,label=label.x, spe=SPe,rm=`RMscore(average)`,len1,len2,len_min,starts_with("ncon"),starts_with("f_"),mapaln_norm)
+```
+
+
+```{r}
+mapaln.rmsp3 <- mapaln.rmsp2 %>%
+  mutate(norm0 = V5) %>%
+  mutate(norm1 = mapaln_norm) %>%
+  mutate(norm2 = mapaln_norm * nconbylen1) %>%
+  mutate(norm3 = V5/len_min ) %>%
+  mutate(norm4 = V5 / len_min^(0.3)) %>%
+  mutate(norm5 = V5 / len_min^(0.7)) %>%
+  as.tibble()
+
+ggplot(mapaln.rmsp3,aes(x=norm5,y=rm,color = as.factor(label)),)+geom_point()
+  
+```
+
+
+```{r}
+testit2 <- function(pred_list, label){
+  rslt <- lapply(1:ncol(pred_list),function(i) testit(pred_list[[i]],label))
+  rslt.df <-do.call(rbind,rslt)
+  row.names(rslt.df) <-  names(pred_list)
+  return(rslt.df)
+}
+```
+
+
+```{r}
+
+test.df <- mapaln.rmsp3 %>% filter(nconbylen1 >1)
+
+norm.rslt <-list()
+
+norm.rslt$df <- testit2(test.df %>% select(starts_with("norm"),rm,spe), test.df$label)
+
+norm.rslt$gg <- ggROC(test.df %>% select(starts_with("norm"),rm,spe), test.df$label)
+
+norm.rslt$df
+norm.rslt$gg
+```
+
+```{r}
+ggplot(mapaln.rmsp3,aes(x=nconbylen1))+geom_density()
+```
+
+
+```{r}
+
+norm.rslt$ggroc <- ggROC(mapaln.rmsp3 %>% select(starts_with("norm")), mapaln.rmsp3$label)
+
+save(norm.rslt,file="../spalign_data/tmpdata/norm.rslt.rda")
+```
+

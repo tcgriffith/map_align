@@ -1,0 +1,450 @@
+---
+title: "Untitled"
+author: "TC"
+date: "9/28/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## R Markdown
+
+
+```{r}
+source("~/GIT/spalign/SPalignNS/scripts/misc_funs.R")
+```
+
+```{r}
+get_pdbchain <- function(v_str){
+  return(gsub(".*(...._.)\\.pdb.*","\\1",v_str))
+}
+
+```
+
+
+
+
+```{r}
+pos <- data.table::fread("~/GIT/map_align/spalign_data/RMalign/datasets/scor/out/mapalign_pqlist.out")
+
+neg <- data.table::fread("~/GIT/map_align/spalign_data/RMalign/datasets/scor/out/mapalign_negpqlist.out")
+
+pos$label = 1
+neg$label = 0
+```
+
+```{r}
+df.all <-rbind(pos,neg)
+```
+
+```{r}
+testit(df.all$V5,df.all$label)
+```
+
+
+```{r eval=FALSE}
+ncon <- data.table::fread("~/GIT/map_align/spalign_data/RMalign/datasets/scor/pdb_chain_map.len")
+
+ncon.cln <- ncon %>%
+  mutate(pdb_chain = get_pdbchain(V1)) %>%
+  select(pdb_chain, nconn = V2)
+```
+
+
+```{r nonlocal}
+# ncon.cln <- 
+load("../spalign_data/tmpdata/ncon.cln.rda")
+
+```
+
+
+## a
+
+<!-- - todo: read line, make it shine. -->
+
+```{r}
+df.all.cln <- df.all %>%
+  mutate(pdb_chain =get_pdbchain(V1)) %>%
+  # 
+  left_join(ncon.cln) %>% #as.tibble()
+  rename(pdb_chain1=pdb_chain, nconn1 = nconn) %>%
+  mutate(pdb_chain =get_pdbchain(V2)) %>%
+  left_join(ncon.cln) %>%
+  rename(pdb_chain2=pdb_chain, nconn2 = nconn)
+
+```
+
+```{r}
+df.all.cln.norm <- df.all.cln %>%
+  mutate(mapaln_norm = V5/pmin(nconn1,nconn2))
+```
+
+
+```{r}
+rslt <- list()
+
+rslt$mapaln <- testit(df.all.cln.norm$mapaln_norm,df.all.cln.norm$label)
+
+rslt$mapaln_unnorm <- testit(df.all.cln.norm$V5,df.all.cln.norm$label)
+
+do.call(rbind,rslt)
+```
+
+### compare with rmalign
+
+```{r}
+rmsp.l2 <- readRDS("~/GIT/spalign/SPalignNS/spalign_data/tmpdata/rmsp.l.rds")
+
+rmsp_a0.anno <- rmsp.l2$rmsp_a3.anno
+```
+
+
+```{r}
+mapaln <- df.all.cln.norm %>%
+  mutate(pair = ifelse(pdb_chain1 > pdb_chain2,
+                       paste0(pdb_chain1,"-",pdb_chain2),
+                       paste0(pdb_chain2,"-",pdb_chain1)))
+
+
+mapaln.rmsp <- mapaln %>%
+  left_join(rmsp_a0.anno,by=("pair"="pair")) %>%
+      mutate(f_contact1 = nconn1/(len1*(len1-1)/2),
+         f_contact2 = nconn2/(len2*(len2-1)/2)) 
+# rmsp_tmp 
+
+save(mapaln.rmsp, file = "../spalign_data/tmpdata/mapaln.rmsp.rda")
+```
+
+
+```{r}
+testit2 <- function(pred_list, label){
+  rslt <- lapply(1:ncol(pred_list),function(i) testit(pred_list[[i]],label))
+  rslt.df <-do.call(rbind,rslt)
+  row.names(rslt.df) <-  names(pred_list)
+  return(rslt.df)
+}
+
+```
+
+
+```{r}
+testit2_by_len <- function(pred_list, label, lenbin){
+  rslt <- lapply(levels(lenbin), function(x){
+    # testit2(pred_list[which(lenbin == x),],label[which(lenbin == x)])
+    # return(data.frame(pred_list[which(lenbin == x),],label = label[which(lenbin == x)]))
+    pred_l <- pred_list[which(lenbin == x),]
+    label_l <- label[which(lenbin == x)]
+    
+    if(nrow(pred_l)){
+      tmprslt <-testit2(pred_l,label_l)
+      tmprslt$lenbin = x
+      tmprslt$score=rownames(tmprslt)
+      return(tmprslt)
+    }
+    else{
+      return(NULL)
+    }
+  
+  })
+  
+  # rslt.df <-do.call(rbind,rslt)
+  return(rslt)
+}
+```
+
+
+```{r}
+rslt.mapaln <-list()
+```
+
+
+
+```{r}
+tmp <- 
+testit2_by_len(
+    mapaln.rmsp %>% select(`RMscore(average)`,
+                         SPe,
+                         mapaln_norm),
+  mapaln.rmsp$label.x,
+  mapaln.rmsp$lenbin
+)
+
+tmp.all <- do.call(rbind,tmp)
+
+rslt.mapaln$dflen<- tmp.all
+```
+
+
+```{r}
+ggdata3 = tmp.all
+
+gg1 <- ggplot(ggdata3,aes(x=lenbin,y=auc,fill =score))+
+  geom_col(position = "dodge")
+
+rslt.mapaln$gg1 <- gg1
+```
+
+
+
+```{r}
+
+mapaln.rmsp.low <- mapaln.rmsp %>% filter(pmin(f_contact1,f_contact2) < 0.083)
+table(mapaln.rmsp.low$label.x)
+mapaln.rmsp.high <-  mapaln.rmsp %>% filter(pmin(f_contact1,f_contact2) > 0.083)
+
+table(mapaln.rmsp.high$label.x)
+
+testit2(
+  mapaln.rmsp.low %>% select(`RMscore(average)`,
+                         SPe, 
+                         mapaln_norm,
+                         mapaln_unf = V5),
+  mapaln.rmsp.low$label.x
+)
+
+testit2(
+  mapaln.rmsp.high %>% select(`RMscore(average)`,
+                         SPe, 
+                         mapaln_norm,
+                         mapaln_unf = V5),
+  mapaln.rmsp.high$label.x
+)
+
+```
+
+```{r}
+mapaln.low <- mapaln.rmsp %>%
+  filter()
+
+dfall <- testit2(
+  mapaln.rmsp %>% select(`RMscore(average)`,
+                         SPe, 
+                         mapaln_norm,
+                         mapaln_unf = V5),
+  mapaln.rmsp$label.x
+)
+
+dfall
+rslt.mapaln$dfall <- dfall
+```
+
+
+```{r eval=FALSE}
+rslt <- list()
+
+
+mapaln.rmsp2 <- mapaln.rmsp %>%
+    mutate(f_contact1 = nconn1/(len1*(len1-1)/2),
+         f_contact2 = nconn2/(len2*(len2-1)/2)) %>%
+  # filter(label.x ==1) %>%
+  # filter(pmin(f_contact1,f_contact2) > 0.1) %>%
+  as.tibble()
+
+rslt$rmalign <- testit(mapaln.rmsp2$`RMscore(average)`,mapaln.rmsp2$label.x)
+rslt$spalign <- testit(mapaln.rmsp2$SPe,mapaln.rmsp2$label.x)
+rslt$mapalign <- testit(mapaln.rmsp2$mapaln_norm,mapaln.rmsp2$label.x)
+rslt$mapalign_unf <- testit(mapaln.rmsp2$V5,mapaln.rmsp2$label.x)
+
+
+do.call(rbind,rslt)
+```
+
+
+
+```{r}
+
+ggdata <- mapaln.rmsp
+# %>%  filter(len_min < 80, len_min > 30)
+
+
+ggscore<-  ggplot(data=ggdata,aes(x=mapaln_norm,y=`RMscore(average)`,color=as.factor(label.x)))+
+  geom_point()
+ggscore
+rslt.mapaln$ggscore <- ggscore
+  ggplot(data=ggdata,aes(x=V5,y=`RMscore(average)`,color=as.factor(label.x)))+
+  geom_point()
+```
+
+
+```{r}
+ggdata %>%
+  filter(`RMscore(average)` > 0.8, mapaln_norm < 0.17) %>%
+  select()
+```
+
+
+```{r}
+ggdata %>%
+  filter(`RMscore(average)` < 0.25, mapaln_norm > 0.48)
+```
+
+
+```{r}
+myfiles <- list.files("/home/tc/GIT/map_align/spalign_data/RMalign/datasets/scor/pdb_chain_map/",full.names = TRUE)
+```
+
+
+```{r}
+source("../scripts/mapaln_funs.R")
+
+tmp1 <-read_contactmap("/home/tc/GIT/map_align/spalign_data/RMalign/datasets/scor/pdb_chain_map/1g1x_J.pdb.map")
+
+ggcon1 <- plot_contactmap(tmp1)
+
+tmp2 <- read_contactmap("/home/tc/GIT/map_align/spalign_data/RMalign/datasets/scor/pdb_chain_map/1g1x_E.pdb.map")
+
+ggcon2 <-plot_contactmap(tmp2)
+
+ggcon1
+ggcon2
+
+rslt.mapaln$ggcon1 <- ggcon1
+rslt.mapaln$ggcon2 <- ggcon2
+
+
+```
+
+
+
+```{r}
+# ggplot(mapaln.rmsp %>% filter(label == 0),aes(x = len_min,y=mapaln_norm))+
+#   geom_point()
+```
+
+
+
+```{r}
+
+rocdata <- mapaln.rmsp
+
+
+ggroc <- ggROC(rocdata%>% select(`RMscore(average)`,SPe,mapaln_norm,mapaln_unf =V5),rocdata$label.x)
+ggroc
+
+rslt.mapaln$ggroc <- ggroc
+
+```
+
+
+```{r}
+
+save(rslt.mapaln,file="../spalign_data/tmpdata/rslt.mapaln.rda")
+```
+
+
+### contact vs length
+
+
+```{r}
+mapaln.rmsp.anno <-
+  mapaln.rmsp %>%
+  mutate(f_contact1 = nconn1/(len1*(len1-1)/2),
+         f_contact2 = nconn2/(len2*(len2-1)/2)) %>%
+  # filter(label.x ==1) %>%
+  filter(pmin(f_contact1,f_contact2) > 0.05)
+  # filter(`RMscore(average)` > 0.8, mapaln_norm < 0.17) %>%
+  # select(pair,starts_with("f_contact"))
+
+mapaln.rmsp.anno
+
+ggdata2 <- mapaln.rmsp.anno
+
+ggplot(data=ggdata2,aes(x=mapaln_norm,y=`RMscore(average)`))+
+  geom_point()
+
+# summary(mapaln.rmsp.anno%>% select(starts_with("f_contact")))
+```
+
+
+
+
+### ggROC
+
+-in misc_funs now.
+
+```{r}
+
+ggROC <- function(pred_list, label) {
+  # label_list = pred_list %>%
+  #   mutate(label = label) %>%
+  #   mutate_all(.funs = dplyr::vars(label))
+  
+  label_list = sapply(1:ncol(pred_list),function(x) return(label))
+  
+  mypred <- ROCR::prediction(pred_list, label_list)
+  perf.mat <-
+    ROCR::performance(mypred, measure = "tpr", x.measure = "fpr")
+  
+  df <-
+    data.frame(
+      Curve = unlist(sapply(1:ncol(pred_list), function(x) {
+        c(rep(names(pred_list)[x], length(perf.mat@x.values[[x]])))
+      })),
+      FalsePositive = unlist(c(perf.mat@x.values)),
+      TruePositive = unlist(c(perf.mat@y.values))
+    )
+  gg <-
+    ggplot2::ggplot(df, aes(x = FalsePositive, y = TruePositive, color = Curve)) + ggplot2::geom_line()
+  
+  return(gg)
+}
+
+```
+
+
+
+
+```{r}
+pred_list = df.all.cln.norm %>%
+  select(V3,V5,mapaln_norm)
+
+ggROC(pred_list, df.all.cln.norm$label)
+```
+
+
+```{r}
+ggdata4 <- mapaln.rmsp %>%
+  mutate(nconlen1=nconn1/len1,nconlen2 =nconn2/len2)
+
+ggplot(ggdata4,aes(x=len1,y=nconlen1))+geom_point()+geom_smooth()
+
+
+ggplot(ggdata4,aes(x=len2,y=nconlen2))+geom_point() +geom_smooth()
+```
+
+
+```{r}
+ggplot(diamonds, aes(carat)) +geom_smooth()
+```
+
+
+```{r tryggroc,eval=FALSE}
+
+# label_list = df.all.cln.norm %>%
+#   select(V3,V5,mapaln_norm) %>%
+#   mutate_all(.funs=vars(df.all.cln.norm$label))
+#   
+# mypred <- ROCR::prediction(pred_list, label_list)
+# perf.mat <- ROCR::performance(mypred, measure = "tpr", x.measure = "fpr")
+# 
+# 
+#   df <-
+#   data.frame(
+#     Curve = unlist(sapply(1:ncol(pred_list), function(x) {
+#       c(rep(names(pred_list)[x], length(perf.mat@x.values[[x]])))
+#     })),
+#     FalsePositive = unlist(c(perf.mat@x.values)),
+#     TruePositive = unlist(c(perf.mat@y.values))
+#   )
+# 
+# gg <-
+#   ggplot2::ggplot(df, aes(x = FalsePositive, y = TruePositive, color = Curve)) + ggplot2::geom_line()
+# 
+# gg
+```
+
+
+
